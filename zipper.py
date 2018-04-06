@@ -11,15 +11,12 @@ class BinPacker:
 
   def bits(self, bits):
     self.buffer.extend(bits)
-    return self
 
   def int8(self, int8):
     self.buffer.frombytes(struct.pack('b', int8))
-    return self
 
   def int32(self, int32):
     self.buffer.frombytes(struct.pack('l', int32))
-    return self
 
   def pack(self):
     return self.buffer.tobytes()
@@ -36,24 +33,23 @@ class BinUnpacker:
     self.buffer.frombytes(bytes)
 
   def peek(self, length):
-    return self.buffer[0:length]
+    return self.buffer[:length]
 
   def bits(self, length):
-    bits = self.buffer[0:length]
-    self.buffer = self.buffer[length:]
+    bits = self.buffer[:length]
+    del self.buffer[:length]
     return bits
 
   def int8(self):
-    next = self.buffer[0:8]
-    self.buffer = self.buffer[8:]
-    i = struct.unpack('b', next.tobytes())[0]
-    return i
+    return self._unpack_format('b')
 
   def int32(self):
-    next = self.buffer[0:8*8]
-    self.buffer = self.buffer[8*8:]
-    i = struct.unpack('l', next.tobytes())[0]
-    return i
+    return self._unpack_format('l')
+
+  def _unpack_format(self, format):
+    length = struct.calcsize(format) * 8
+    bits = self.bits(length)
+    return struct.unpack(format, bits.tobytes())[0]
 
 Leaf = namedtuple('Leaf', ('byte', 'count'))
 Node = namedtuple('Node', ('left', 'right', 'count'))
@@ -67,7 +63,6 @@ def compress(original):
   packer = BinPacker()
 
   packer.int32(len(original))
-
   pack_table(table, packer)
 
   for byte in original.encode('utf8'):
@@ -114,7 +109,7 @@ def look_up_byte(table, byte):
     if row.byte == byte:
       return row.bits
 
-  raise ValueError()
+  raise ValueError('byte ({}) not found in table'.format(byte))
 
 def look_up_bits(table, unpacker):
   for row in table:
@@ -123,7 +118,7 @@ def look_up_bits(table, unpacker):
       unpacker.bits(len(row.bits))
       return row.byte
 
-  raise ValueError()
+  raise ValueError('bits not found in table')
 
 def pack_table(table, packer):
   packer.int8(len(table) - 1)
